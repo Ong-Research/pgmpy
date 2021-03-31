@@ -67,7 +67,7 @@ class NoisyOrCPD(TabularCPD):
                             'evidence_card should be same')
         elif (len(evidence) + leaky) != len(inhibitor_probability):
             raise ValueError(
-                'Size of variables and inhibitor_probability should be same'
+                'Size of evidence and inhibitor_probability should be same'
             )
         elif not all(
             0 <= item <= 1 for item in inhibitor_probability
@@ -88,7 +88,7 @@ class NoisyOrCPD(TabularCPD):
             if leaky:
                 inhibitor_index.insert(0, 'leak')
             self.inhibitor_probability = pd.Series(data=inhibitor_probability,
-                                                    index=inhibitor_index)
+                                                   index=inhibitor_index)
             self.leaky = leaky
             # Blank CPT added -- need to add
             # functionality to convert to CPT later.
