@@ -10,7 +10,8 @@ from pgmpy.models import BayesianModel
 class TestNoisyOrMLEEstimator(unittest.TestCase):
     def setUp(self):
         self.d1 = pd.DataFrame(
-            data={"A": [0, 0, 1], "B": [0, 1, 0], "C": [1, 1, 0], "D": ["X", "Y", "X"]}
+            data={"A": [0, 0, 1], "B": [0, 1, 0],
+                  "C": [1, 1, 0], "D": ["X", "Y", "X"]}
         )
         self.d2 = pd.DataFrame(
             data={
