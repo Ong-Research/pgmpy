@@ -44,22 +44,21 @@ class NoisyOrMLE(ParameterEstimator):
                                    ('C', 'D'), ('B', 'E')])
         >>> estimator = NoisyOrMLE(model, data)
         """
-
         if not isinstance(model, BayesianModel):
             raise NotImplementedError(
-                "Noisy Or Estimate is only implemented for BayesianModel"
+                "Noisy-Or Estimate is only implemented for BayesianModel"
             )
         if not isinstance(data, pd.DataFrame):
             raise ValueError(
                 "Data is not pandas DataFrame"
             )
         if weights is None:
-            self.weights = np.ones((data.shape[0], 1))
+            self.weights = np.ones((data.shape[0],))
         else:
             self.weights = weights
-            weights.shape = (data.shape[0], 1)
+            if len(self.weights.shape) > 1:
+                self.weights.shape = (self.weights.shape[0],)
         super(NoisyOrMLE, self).__init__(model, data, **kwargs)
-
 
     def get_parameters(self):
         """
@@ -83,13 +82,11 @@ class NoisyOrMLE(ParameterEstimator):
         >>> estimator = NoisyOrMLE(model, values)
         >>> estimator.get_parameters()
         """
-
         parameters = []
         for node in sorted(self.model.nodes()):
             cpd = self.estimate_cpd(node)
             parameters.append(cpd)
         return parameters
-
 
     def estimate_cpd(self, node, leaky=True):
         """
@@ -113,7 +110,9 @@ class NoisyOrMLE(ParameterEstimator):
         >>> import pandas as pd
         >>> from pgmpy.models import BayesianModel
         >>> from pgmpy.estimators import NoisyOrMLE
-        >>> data = pd.DataFrame(data={'A': [0, 0, 1], 'B': [0, 1, 0], 'C': [1, 1, 0]})
+        >>> data = pd.DataFrame(data={'A': [0, 0, 1],
+                                      'B': [0, 1, 0],
+                                      'C': [1, 1, 0]})
         >>> model = BayesianModel([('A', 'C'), ('B', 'C')])
         >>> cpd_A = NoisyOrMLE(model, data).estimate_cpd('A')
         >>> print(cpd_A)
@@ -128,7 +127,6 @@ class NoisyOrMLE(ParameterEstimator):
         B    0.333333
         dtype: float64
         """
-
         parents = self.model.get_parents(node)
         node_cardinality = len(self.state_names[node])
         parent_cardinalities = [len(self.state_names[parent]) for parent in parents]
@@ -139,7 +137,6 @@ class NoisyOrMLE(ParameterEstimator):
         y = np.array(self.data[node])
         y.shape = (y.shape[0], 1)
         w = self.weights
-
         if not parents:
             # Learn a MLE CPT on nodes with no parents.
             mle = MaximumLikelihoodEstimator(self.model, self.data)
@@ -160,69 +157,74 @@ class NoisyOrMLE(ParameterEstimator):
 
 def LeakyLL(theta, X, y, w):
     """
-    Noisy-Or log likelihood of parent data X and child data y with leak node.
+    Log likelihood of parent data X and child data y with leak node.
     """
-    D = np.append(np.append(y, w, axis=1), X, axis=1)
-    log_likelihoods = np.apply_along_axis(LogProbLeaky, 1, D, theta=theta)
-    return -sum(log_likelihoods)
+    D = np.append(y, X, axis=1)
+    likelihoods = np.apply_along_axis(LikelihoodLeaky, 1, D, theta=theta)
+    log_likelihoods = np.log(likelihoods)
+    weighted_log_likelihoods = np.multiply(w, log_likelihoods)
+    return -np.sum(weighted_log_likelihoods)
 
 
 def NoLeakyLL(theta, X, y, w):
     """
-    Noisy-Or log likelihood of parent data X and child data y without
+    Log likelihood of parent data X and child data y without
     leak node.
     """
-    D = np.append(np.append(y, w, axis=1), X, axis=1)
-    log_likelihoods = np.apply_along_axis(LogProbNoLeaky, 1, D, theta=theta)
-    return -sum(log_likelihoods)
+    D = np.append(y, X, axis=1)
+    likelihoods = np.apply_along_axis(LikelihoodNoLeaky, 1, D, theta=theta)
+    log_likelihoods = np.log(likelihoods)
+    weighted_log_likelihoods = np.multiply(w, log_likelihoods)
+    return -np.sum(weighted_log_likelihoods)
 
 
-def LogProbLeaky(D, theta):
+def LikelihoodLeaky(D, theta):
     """
-    Noisy-Or log probability of single data observation D with leak node.
+    Likelihood of single data observation D with leak node.
+    y is assumed to be first element of vector D.
     """
     theta0 = theta[0]
     thetaI = theta[1:]
     y = D[0]
-    w = D[1]
-    X = D[2:]
+    X = D[1:]
+    p = theta0 * np.prod(np.power(thetaI, X))
     if y == 0:
-        return w * (math.log(theta0) + sum(X*np.log(thetaI)))
+        return p
     if y == 1:
-        return w * math.log(1 - (theta0 * np.prod(np.power(thetaI, X))))
+        return 1 - p
     else:
         return ValueError
 
 
-def LogProbNoLeaky(D, theta):
+def LikelihoodNoLeaky(D, theta):
     """
-    Noisy-Or Log probability of single data observation D without leak node.
+    Likelihood of single data observation D without leak node.
+    y is assumed to be first element of vector D.
     """
     y = D[0]
-    w = D[1]
-    X = D[2:]
+    X = D[1:]
+    p = np.prod(np.power(theta, X))
     if y == 0:
-        return w * sum(X*np.log(theta))
+        return p
     if y == 1:
-        return w * math.log(1 - np.prod(np.power(theta, X)))
+        return 1 - p
     else:
         return ValueError
 
 
 def GradientLeaky(theta, X, y, w):
     """
-    Leaky Noisy-Or gradient of parent data X and child data y.
+    Leaky gradient of parent data X and child data y.
     """
     grad = np.zeros(theta.shape)
-    temp = LeakGradient(theta, X, y, w)
-    grad[0] = temp
+    grad[0] = LeakGradient(theta, X, y, w)
     grad[1:] = InhibitorGradientLeaky(theta, X, y, w)
     return -grad
 
 
 def GradientNoLeaky(theta, X, y, w):
     """
-    No-leaky Noisy-Or gradient of parent data X and child data y.
+    No-leaky gradient of parent data X and child data y.
     """
     grad = np.zeros(theta.shape)
     grad[:] = InhibitorGradientNoLeaky(theta, X, y, w)
@@ -231,13 +233,13 @@ def GradientNoLeaky(theta, X, y, w):
 
 def LeakGradient(theta, X, y, w):
     """
-    Noisy-Or leak node gradient.
+    Leak node gradient.
     """
     theta0 = theta[0]
     thetaI = theta[1:]
     y0_idx = np.where((y == 0).all(axis=1))
     y1_idx = np.where((y == 1).all(axis=1))
-    n_y0 = len(y0_idx[0])
+    n_y0 = np.sum(w[y0_idx])
     term1 = n_y0 / theta0
     X_y1 = X[y1_idx]
     w_y1 = w[y1_idx]
@@ -254,7 +256,7 @@ def LeakGradient(theta, X, y, w):
 
 def LeakQuotient(x, theta0, thetaI):
     """
-    Quotient term in Noisy-Or leak node gradient.
+    Quotient term in leak node gradient.
     """
     numerator = np.prod(np.power(thetaI, x))
     denominator = 1 - theta0 * np.prod(np.power(thetaI, x))
@@ -263,7 +265,7 @@ def LeakQuotient(x, theta0, thetaI):
 
 def InhibitorGradientLeaky(theta, X, y, w):
     """
-    Leaky gradient of Noisy-Or inhibitor parameters,
+    Leaky gradient of inhibitor parameters,
     excluding leak node parameter.
     """
     theta0 = theta[0]
@@ -274,11 +276,10 @@ def InhibitorGradientLeaky(theta, X, y, w):
         x = X[:, i]
         x = np.reshape(x, (x.shape[0], 1))
         D = np.append(x, y, axis=1)
-
         # Subset data by x=1,y=0 & x=1,y=1
         x1_y0_idx = np.where(np.all(D == (1, 0), axis=1))
         x1_y1_idx = np.where(np.all(D == (1, 1), axis=1))
-        n_x1_y0 = len(x1_y0_idx[0])
+        n_x1_y0 = np.sum(w[x1_y0_idx])
         x1_y1 = X[x1_y1_idx]
         w_x1_y1 = w[x1_y1_idx]
         term1 = n_x1_y0 / thetai
@@ -296,8 +297,7 @@ def InhibitorGradientLeaky(theta, X, y, w):
 
 def InhibitorGradientNoLeaky(theta, X, y, w):
     """
-    No-leaky gradient of Noisy-Or inhibitor parameters,
-    excluding leak node parameter.
+    No-leaky gradient of inhibitor parameters.
     """
     grad = []
     for i in range(X.shape[1]):
@@ -305,14 +305,12 @@ def InhibitorGradientNoLeaky(theta, X, y, w):
         x = X[:, i]
         x = np.reshape(x, (x.shape[0], 1))
         D = np.append(x, y, axis=1)
-
         # Subset data by x=1,y=0 & x=1,y=1
         x1_y0_idx = np.where(np.all(D == (1, 0), axis=1))
         x1_y1_idx = np.where(np.all(D == (1, 1), axis=1))
-        n_x1_y0 = len(x1_y0_idx[0])
+        n_x1_y0 = np.sum(w[x1_y0_idx])
         x1_y1 = X[x1_y1_idx]
         w_x1_y1 = w[x1_y1_idx]
-
         term1 = n_x1_y0 / thetai
         term2 = np.apply_along_axis(InhibitorQuotientNoLeaky,
                                     1,
@@ -326,7 +324,7 @@ def InhibitorGradientNoLeaky(theta, X, y, w):
 
 def InhibitorQuotientLeaky(x, theta0, thetaI, i):
     """
-    Leaky quotient term in Noisy-Or inhibitor gradient.
+    Leaky quotient term in inhibitor gradient.
     """
     x_exclude = np.delete(x, i)
     thetaI_exclude = np.delete(thetaI, i)
@@ -337,7 +335,7 @@ def InhibitorQuotientLeaky(x, theta0, thetaI, i):
 
 def InhibitorQuotientNoLeaky(x, theta, i):
     """
-    No-leaky quotient term in Noisy-Or inhibitor gradient.
+    No-leaky quotient term in inhibitor gradient.
     """
     x_exclude = np.delete(x, i)
     theta_exclude = np.delete(theta, i)

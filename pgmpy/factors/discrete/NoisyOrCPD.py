@@ -100,8 +100,23 @@ class NoisyOrCPD(TabularCPD):
                 evidence,
                 evidence_card
             )
+
     def __str__(self):
         return str(self.inhibitor_probability)
+
+    def __repr__(self):
+        var_str = f"<NoisyOrCPD representing P({self.variable}:{self.variable_card}"
+
+        evidence = self.variables[1:]
+        evidence_card = self.cardinality[1:]
+        if evidence:
+            evidence_str = " | " + ", ".join(
+                [f"{var}:{card}" for var, card in zip(evidence, evidence_card)]
+            )
+        else:
+            evidence_str = ""
+
+        return var_str + evidence_str + f") at {hex(id(self))}>"
 
     def likelihood(self, data):
         """
