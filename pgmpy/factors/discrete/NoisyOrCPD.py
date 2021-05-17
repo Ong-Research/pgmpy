@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 from pgmpy.factors.discrete import TabularCPD
+from pgmpy.models import NoisyOrModel
 
 
 class NoisyOrCPD(TabularCPD):
@@ -135,38 +136,7 @@ class NoisyOrCPD(TabularCPD):
         parent_data = data[parents]
 
         if leaky:
-            # Extract leaky likelihood from inhibitor probabilities
-            p0 = inhibitor_probability[0]
-            inhibitor_probability = inhibitor_probability[1:]
-            def leaky_parent_likelihood(x, pi, p0=p0):
-                """Likelihood of single edge in Leaky Noisy-Or"""
-                if x == 0:
-                    return 1
-                else:
-                    return (1-pi) / (1-p0)
-            # Calculate product of inhibitor probabilities across positive
-            # instances in parent_data.
-            prod_term = parent_data.combine(inhibitor_probability,
-                                            leaky_parent_likelihood)
-            if child_data == 0:
-                return (1-p0) * np.prod(prod_term)
-            else:
-                return 1-(1-p0) * np.prod(prod_term)
-        else:
-            def parent_likelihood(x, pi):
-                """Likelihood of single edge in Noisy-Or"""
-                if x == 0:
-                    return 1
-                else:
-                    return 1 - pi
-            # Calculate product of inhibitor probabilities across positive
-            # instances in parent_data.
-            prod_term = parent_data.combine(inhibitor_probability,
-                                            parent_likelihood)
-            if child_data == 0:
-                return np.prod(prod_term)
-            else:
-                return 1 - np.prod(prod_term)
+            np.append(child_data, parent_data, axis=1)
 
     def get_row_likelihoods(self, data):
         """
@@ -176,16 +146,12 @@ class NoisyOrCPD(TabularCPD):
             A DataFrame object with column names same as the variables
             in the model.
         """
-
-        return data.apply(self.likelihood, axis = 1)
+        pass
 
     def get_likelihood(self, data):
         """Calculates likelihood of data given the model"""
-
-        return np.prod(self.get_row_likelihoods(data))
+        pass
 
     def get_log_likelihood(self, data):
         """Calculates log likelihood of data given the model"""
-
-        ll = self.get_row_likelihoods(data).apply(math.log)
-        return np.sum(ll)
+        pass
