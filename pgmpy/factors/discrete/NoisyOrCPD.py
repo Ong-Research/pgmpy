@@ -9,7 +9,8 @@ import pandas as pd
 
 from pgmpy.factors.discrete import TabularCPD
 from pgmpy.models import NoisyOrModel
-
+from pgmpy.models.NoisyOrModel import LikelihoodLeaky
+from pgmpy.models.NoisyOrModel import LikelihoodNoLeaky
 
 class NoisyOrCPD(TabularCPD):
     """
@@ -90,7 +91,12 @@ class NoisyOrCPD(TabularCPD):
                 inhibitor_index.insert(0, 'leak')
             self.inhibitor_probability = pd.Series(data=inhibitor_probability,
                                                    index=inhibitor_index)
-            self.leaky = leaky
+            if leaky is not None:
+                self.leaky = leaky
+            else:
+                print(inhibitor_probability)
+                print(evidence)
+                self.leaky = leaky
             # Blank CPT added -- need to add
             # functionality to convert to CPT later.
             cpt = np.zeros((variable_card, np.product(evidence_card)))
@@ -119,39 +125,46 @@ class NoisyOrCPD(TabularCPD):
 
         return var_str + evidence_str + f") at {hex(id(self))}>"
 
-    def likelihood(self, data):
+    def data_likelihoods(self, data):
         """
-        Calculates the likelihood of a single data observation given the model.
+        Calculates the likelihoods of each observation given the model.
 
         data : pandas Series object
             A Series object with axis labels the same as variables in the
             model.
         """
-
-        inhibitor_probability = self.inhibitor_probability
         child = self.variables[0]
         parents = self.variables[1:]
-        leaky = self.leaky
-        child_data = data[child]
-        parent_data = data[parents]
+        y = np.array(data[child])
+        X = np.array(data[parents])
+        y.shape = (y.shape[0], 1)
+        D = np.append(y, X, axis=1)
+        if self.leaky:
+            l = LikelihoodLeaky
+        else:
+            l = LikelihoodNoLeaky
+        likelihoods = np.apply_along_axis(l, 1,
+                                          D, theta=self.inhibitor_probability)
+        return likelihoods
 
-        if leaky:
-            np.append(child_data, parent_data, axis=1)
-
-    def get_row_likelihoods(self, data):
+    def likelihood(self, data):
         """
-        Calculates likelihood of each observation in the data given the model.
+        Calculates the likelihood of the data given the model.
 
-        data : pandas DataFrame object
-            A DataFrame object with column names same as the variables
-            in the model.
+        data : pandas Series object
+            A Series object with axis labels the same as variables in the
+            model.
         """
-        pass
+        likelihoods = self.data_likelihoods(data)
+        return np.prod(likelihoods)
 
-    def get_likelihood(self, data):
-        """Calculates likelihood of data given the model"""
-        pass
+    def log_likelihood(self, data):
+        """
+        Calculates the log-likelihood of the data given the model.
 
-    def get_log_likelihood(self, data):
-        """Calculates log likelihood of data given the model"""
-        pass
+        data : pandas Series object
+            A Series object with axis labels the same as variables in the
+            model.
+        """
+        likelihoods = self.data_likelihoods(data)
+        return np.sum(np.log(likelihoods))

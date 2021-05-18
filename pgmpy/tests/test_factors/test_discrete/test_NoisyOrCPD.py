@@ -5,7 +5,7 @@ import numpy.testing as np_test
 from pgmpy.factors.discrete.NoisyOrCPD import NoisyOrCPD
 
 def Model1():
-    return NoisyOrCPD("x1", 2, ["x2", "x3", "x4"], [2, 2, 2], [0.4, 0.7, 0.1])
+    return NoisyOrCPD("x1", 2, ["x2", "x3", "x4"], [2, 2, 2], [0.4, 0.7, 0.1], leaky=False)
 
 class TestNoisyOrCPDInit(unittest.TestCase):
 
@@ -75,3 +75,6 @@ class TestNoisyOrCPDInit(unittest.TestCase):
         )
 
     def test_likelihood(self):
+        model = Model1()
+        data = pd.DataFrame({'x1': [1, 0],'x2': [0, 1], 'x3': [1, 1], 'x4': [0, 1]})
+        model.likelihood(data)

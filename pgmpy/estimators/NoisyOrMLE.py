@@ -12,6 +12,10 @@ from pgmpy.estimators import MaximumLikelihoodEstimator
 from pgmpy.factors.discrete.NoisyOrCPD import NoisyOrCPD
 from pgmpy.models import BayesianModel
 from pgmpy.models import NoisyOrModel
+from pgmpy.models.NoisyOrModel import LeakyLL
+from pgmpy.models.NoisyOrModel import NoLeakyLL
+from pgmpy.models.NoisyOrModel import GradientLeaky
+from pgmpy.models.NoisyOrModel import GradientNoLeaky
 
 
 class NoisyOrMLE(ParameterEstimator):
@@ -178,11 +182,11 @@ def NoisyOrFit(X, y, w, leaky):
 
     if leaky:
         m += 1
-        objective = NosiyOrModel.LeakyLL
-        gradient = NoisyOrModel.GradientLeaky
+        objective = LeakyLL
+        gradient = GradientLeaky
     else:
-        objective = NoisyOrModel.NoLeakyLL
-        gradient = NosiyOrModel.GradientNoLeaky
+        objective = NoLeakyLL
+        gradient = GradientNoLeaky
 
     thetaInit = 0.5 * np.ones((m,))
     bounds = Bounds(lb=0.001, ub=0.999)
