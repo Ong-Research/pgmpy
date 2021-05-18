@@ -20,6 +20,7 @@ from pgmpy.factors.discrete import (
 )
 from pgmpy.factors.continuous import ContinuousFactor
 from pgmpy.models.MarkovModel import MarkovModel
+from pgmpy.factors.discrete.NoisyOrCPD import NoisyOrCPD
 
 
 class BayesianModel(DAG):
@@ -782,3 +783,11 @@ class BayesianModel(DAG):
         blanket_nodes = set(blanket_nodes)
         blanket_nodes.discard(node)
         return list(blanket_nodes)
+
+    def log_likelihood(self, data):
+        cpds = self.get_cpds()
+        log_likelihoods = []
+        for cpd in cpds:
+            if isinstance(cpd, NoisyOrCPD):
+                log_likelihoods.append(cpd.log_likelihood(data))
+        return sum(log_likelihoods)
