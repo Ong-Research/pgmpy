@@ -3,7 +3,7 @@ from itertools import chain
 
 import numpy as np
 import networkx as nx
-
+import warnings
 
 class NoisyOrModel(nx.DiGraph):
     """
@@ -124,16 +124,18 @@ class NoisyOrModel(nx.DiGraph):
             for index, prob_array in enumerate(self.inhibitor_probability)
             if index not in indices
         ]
-
+    
 
 def LeakyLL(theta, X, y, w):
     """
     Log likelihood of parent data X and child data y with leak node.
     """
+    print('theta', theta)
     D = np.append(y, X, axis=1)
     likelihoods = np.apply_along_axis(LikelihoodLeaky, 1, D, theta=theta)
     log_likelihoods = np.log(likelihoods)
     weighted_log_likelihoods = np.multiply(w, log_likelihoods)
+    print('log likelihood', -np.sum(weighted_log_likelihoods))
     return -np.sum(weighted_log_likelihoods)
 
 
@@ -190,6 +192,7 @@ def GradientLeaky(theta, X, y, w):
     grad = np.zeros(theta.shape)
     grad[0] = LeakGradient(theta, X, y, w)
     grad[1:] = InhibitorGradientLeaky(theta, X, y, w)
+    print('negative gradient', -grad)
     return -grad
 
 
@@ -214,15 +217,15 @@ def LeakGradient(theta, X, y, w):
     term1 = n_y0 / theta0
     X_y1 = X[y1_idx]
     w_y1 = w[y1_idx]
-    try:
+    if len(X_y1) > 0:
         term2 = np.apply_along_axis(LeakQuotient, 1, X_y1,
                                     theta0=theta0, thetaI=thetaI)
         w_y1.shape = (w_y1.shape[0],)
         term2 = sum(np.multiply(w_y1, term2))
         return term1 - term2
-    except ValueError:
-        print('0 instances of y == 1 in data')
-        print(x_y1)
+    else:
+        warnings.warn('0 instances of y == 1')
+        return 0
 
 
 def LeakQuotient(x, theta0, thetaI):
@@ -251,18 +254,26 @@ def InhibitorGradientLeaky(theta, X, y, w):
         x1_y0_idx = np.where(np.all(D == (1, 0), axis=1))
         x1_y1_idx = np.where(np.all(D == (1, 1), axis=1))
         n_x1_y0 = np.sum(w[x1_y0_idx])
+        if len(x1_y0_idx) == 0:
+            warnings.warn('0 instances of X[:,' + str(i) + '] == 1' +
+                          '& Y == 0')
         x1_y1 = X[x1_y1_idx]
         w_x1_y1 = w[x1_y1_idx]
         term1 = n_x1_y0 / thetai
-        term2 = np.apply_along_axis(InhibitorQuotientLeaky,
-                                    1,
-                                    x1_y1,
-                                    theta0=theta0,
-                                    thetaI=thetaI,
-                                    i=i)
-        w_x1_y1.shape = (w_x1_y1.shape[0],)
-        term2 = sum(np.multiply(w_x1_y1, term2))
-        grad.append(term1 - term2)
+        if len(x1_y1) > 0:
+            term2 = np.apply_along_axis(InhibitorQuotientLeaky,
+                                        1,
+                                        x1_y1,
+                                        theta0=theta0,
+                                        thetaI=thetaI,
+                                        i=i)
+            w_x1_y1.shape = (w_x1_y1.shape[0],)
+            term2 = sum(np.multiply(w_x1_y1, term2))
+            grad.append(term1 - term2)
+        else:
+            warnings.warn('0 instances of X[:,' + str(i) + '] == 1' +
+                          '& Y == 1')
+            grad.append(term1 - 0)
     return grad
 
 
@@ -280,16 +291,24 @@ def InhibitorGradientNoLeaky(theta, X, y, w):
         x1_y0_idx = np.where(np.all(D == (1, 0), axis=1))
         x1_y1_idx = np.where(np.all(D == (1, 1), axis=1))
         n_x1_y0 = np.sum(w[x1_y0_idx])
+        if len(x1_y0_idx) == 0:
+            warnings.warn('0 instances of X[:,' + str(i) + '] == 1' +
+                          '& Y == 0')
         x1_y1 = X[x1_y1_idx]
         w_x1_y1 = w[x1_y1_idx]
         term1 = n_x1_y0 / thetai
-        term2 = np.apply_along_axis(InhibitorQuotientNoLeaky,
-                                    1,
-                                    x1_y1,
-                                    theta=theta,
-                                    i=i)
-        term2 = sum(np.multiply(w_x1_y1, term2))
-        grad.append(term1 - term2)
+        if len(x1_y1) > 0:
+            term2 = np.apply_along_axis(InhibitorQuotientNoLeaky,
+                                        1,
+                                        x1_y1,
+                                        theta=theta,
+                                        i=i)
+            term2 = sum(np.multiply(w_x1_y1, term2))
+            grad.append(term1 - term2)
+        else:
+            warnings.warn('0 instances of X[:,' + str(i) + '] == 1' + 
+                          '& Y == 1')
+            grad.append(term1 - 0)
     return grad
 
 

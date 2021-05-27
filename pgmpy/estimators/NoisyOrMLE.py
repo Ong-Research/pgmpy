@@ -189,11 +189,11 @@ def NoisyOrFit(X, y, w, leaky):
         gradient = GradientNoLeaky
 
     thetaInit = 0.5 * np.ones((m,))
-    bounds = Bounds(lb=0.001, ub=0.999)
+    bounds = Bounds(lb=0, ub=1)
     fit = minimize(objective,
                x0=thetaInit,
                args=(X, y, w),
-               method='L-BFGS-B',
+               method='SLSQP',
                jac=gradient,
                bounds=bounds,
                options={'iprint': -1})
