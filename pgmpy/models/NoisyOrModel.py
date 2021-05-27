@@ -124,18 +124,16 @@ class NoisyOrModel(nx.DiGraph):
             for index, prob_array in enumerate(self.inhibitor_probability)
             if index not in indices
         ]
-    
+
 
 def LeakyLL(theta, X, y, w):
     """
     Log likelihood of parent data X and child data y with leak node.
     """
-    print('theta', theta)
     D = np.append(y, X, axis=1)
     likelihoods = np.apply_along_axis(LikelihoodLeaky, 1, D, theta=theta)
     log_likelihoods = np.log(likelihoods)
     weighted_log_likelihoods = np.multiply(w, log_likelihoods)
-    print('log likelihood', -np.sum(weighted_log_likelihoods))
     return -np.sum(weighted_log_likelihoods)
 
 
@@ -192,7 +190,6 @@ def GradientLeaky(theta, X, y, w):
     grad = np.zeros(theta.shape)
     grad[0] = LeakGradient(theta, X, y, w)
     grad[1:] = InhibitorGradientLeaky(theta, X, y, w)
-    print('negative gradient', -grad)
     return -grad
 
 
@@ -306,7 +303,7 @@ def InhibitorGradientNoLeaky(theta, X, y, w):
             term2 = sum(np.multiply(w_x1_y1, term2))
             grad.append(term1 - term2)
         else:
-            warnings.warn('0 instances of X[:,' + str(i) + '] == 1' + 
+            warnings.warn('0 instances of X[:,' + str(i) + '] == 1' +
                           '& Y == 1')
             grad.append(term1 - 0)
     return grad
