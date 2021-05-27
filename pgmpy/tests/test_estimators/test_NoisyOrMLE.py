@@ -5,10 +5,10 @@ import numpy as np
 from fractions import Fraction
 
 from pgmpy.estimators import NoisyOrMLE
-from pgmpy.estimators.NoisyOrMLE import LikelihoodLeaky
-from pgmpy.estimators.NoisyOrMLE import LikelihoodNoLeaky
-from pgmpy.estimators.NoisyOrMLE import LeakyLL
-from pgmpy.estimators.NoisyOrMLE import GradientLeaky
+from pgmpy.models.NoisyOrModel import LikelihoodLeaky
+from pgmpy.models.NoisyOrModel import LikelihoodNoLeaky
+from pgmpy.models.NoisyOrModel import LeakyLL
+from pgmpy.models.NoisyOrModel import GradientLeaky
 from pgmpy.models import BayesianModel
 
 
